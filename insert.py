@@ -1,15 +1,13 @@
-# only for 轩子
-
 import os, time
-import shutil
-######### Rerender container
+import shutil, glob
+###### Rerender container
 
-render_path = os.getcwd()
-processed_dir = r"E:\\recording\\轩子\\processed\\"
+work_path = os.getcwd()
+processed_dir = work_path + "\\processed\\"
 
 def check():
     videos = 0
-    for filename in os.listdir(render_path):
+    for filename in os.listdir(work_path):
         if (filename.endswith(".mp4")):
             videos += 1
         else:
@@ -41,25 +39,23 @@ def init_job():
 
 
 def rerender():
-    for filename in os.listdir(render_path):
+    for filename in os.listdir(work_path):
         if (filename.endswith(".mp4")): #or .avi, .mpeg, whatever.
-            os.system("ffmpeg -i {0} -c copy E:\\recording\\轩子\\processed\\{0}".format(filename))
-            #print(filename)
+            os.system("ffmpeg -i " + filename + " -c copy " + processed_dir + filename + "".format(filename))
+            #print("ffmpeg -i " + filename + " -c copy " + processed_dir + filename + "")
         else:
             continue
     print("All files rerender completed!")
 
-######### Post processing(insert videos)
-
-processed_path = r"E:\\recording\\轩子\\processed\\"
+###### Post processing(insert videos)
 
 def creat_meg():
-    for filename in os.listdir(processed_path):
+    for filename in os.listdir(processed_dir):
         if (filename.endswith(".txt")):
-            os.remove(processed_path + "merge.txt")
+            os.remove(processed_dir + "merge.txt")
         else:
             if (filename.endswith(".mp4")):
-                f = open(processed_path + "merge.txt", "a")
+                f = open(processed_dir + "merge.txt", "a")
                 f.write("file '" + filename + "'" + "\n")
                 f.close()
             else:
@@ -67,14 +63,14 @@ def creat_meg():
     print("merge.txt is successfully created!")
 
 def insertvid():
-    print("Video insertion will start after 5 seconds")
     time.sleep(5)
-    file = open(processed_path + "merge.txt", "r")
-    #print(f.readline()[6:22])
+    print("Videos insertion will start after 5 second")
+    file = open(processed_dir + "merge.txt", "r")
+    #print(file.readline()[6:23])
     filename = file.readline()[6:]
     fname = '_'.join(filename.split('_')[:-1])
-    print(fname)
-    os.system("ffmpeg -fflags +discardcorrupt -f concat -safe 0 -i "+ processed_path + "merge.txt -c copy " + fname + ".mp4".format(fname))
+    #print(fname)
+    os.system("ffmpeg -fflags +discardcorrupt -f concat -safe 0 -i "+ processed_dir + "merge.txt -c copy " + fname + ".mp4".format(fname))
 
 def cleaner():
     print("All operations ran successfully, deleting cache in 5 seconds!")
@@ -86,15 +82,6 @@ def cleaner():
         print("No such directly, quit!")
         quit()
 
-# def ot():
-#     for filename in os.listdir(processed_path):
-#         if (filename.endswith(".mp4")): #or .avi, .mpeg, whatever.
-#             # os.system("ffmpeg -i {0} -c copy E:\\recording\\轩子\\processed\\{0}".format(filename))
-#             print(filename[:16])
-#         else:
-#             continue
-    
-
 
 if __name__ == "__main__":
     check()
@@ -103,5 +90,3 @@ if __name__ == "__main__":
     creat_meg()
     insertvid()
     cleaner()
-    # ot()
-    #print(processed_path)
