@@ -1,128 +1,122 @@
+# /* cSpell:disable */
+
 import os, time
 import shutil, glob
-import logging, sys
-
-# This script only support file name format as 
-# "streamer_2023-01-26_15-46-00.mp4"
-# and only mp4 videos will be processed
-
 ###### Rerender container
 
-###### Global
-work_path = os.getcwd()
-processed_dir = work_path + "\\processed\\"
+gb_path = os.getcwd()
+# work_path = os.getcwd()
+# processed_dir = work_path + "\\processed\\"
 
-###### Logger file
-logging.basicConfig(filename='insert.log',
-                    filemode='w',
-                    level=logging.DEBUG, 
-                    format='[%(asctime)s] [%(levelname)s] - %(message)s')
+def start():
+    for folder in os.listdir(gb_path):
+        # print(type(folder))
+        wpath = gb_path + "\\" + folder + "\\"
+        # print(wpath)
+        if (os.path.isdir(wpath)):
+            vids = check(wpath)
+            if ( vids != 0 and vids > 1 ):
+                prc_dir = init_job(wpath)
+                rerender(wpath, prc_dir, vids)
+                creat_meg(prc_dir)
+                insertvid(wpath, prc_dir)
+                cleaner(prc_dir)
+            elif (vids == 1):
+                prc_dir = init_job(wpath)
+                rerender(wpath, prc_dir, vids)
+                cleaner(prc_dir)
+            else:
+                print("\033[1;31m No video src detected, quitting.")
+                quit()
+        else:
+            print("\033[1;31m No Folder found! END process!")
+            quit()
 
-# Console logger
-logFormatter = logging.Formatter('[%(asctime)s] [%(levelname)s] - %(message)s')
-rootLogger = logging.getLogger()
-consoleHandler = logging.StreamHandler()
-consoleHandler.setFormatter(logFormatter)
-rootLogger.addHandler(consoleHandler)
-#logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
 
-def check():
+def check(wpath):
     videos = 0
-    for filename in os.listdir(work_path):
-        if (filename.endswith(".mp4")):
+    for filename in os.listdir(wpath):
+        if (filename.endswith(".ts")):
             videos += 1
         else:
             continue
     if (videos == 0):
-        #print("No MP4 files in the working directory, quitting ")
-        logging.error("No MP4 files in the working directory, quitting ")
-        quit()
+        print("\033[1;31m No MP4 files in the working directory, quitting ")
+        return 0
     else:
-        #print(str(videos) + " MP4 files detected, Starting.")
-        logging.info(str(videos) + " MP4 files detected, Starting.")
+        print("\033[1;32m " + str(videos) + " ts files detected, Starting. Curr directory: " + wpath)
+        return videos
 
-def init_job():
-    if os.path.exists(processed_dir):
-        #print("History cache detected, cleaning.")
-        logging.info("History cache detected, cleaning.")
-        shutil.rmtree(processed_dir)
-        os.makedirs(processed_dir)
-        #print('"processed" folder created successfully!')
-        logging.info('Old "processed" folder created successfully! Videos processing will start after 5 seconds.')
-        #print("Videos processing will start after 5 seconds.")
+
+def init_job(wpath):
+    prc_dir = wpath + "prc\\"
+    if os.path.exists(prc_dir):
+        print("\033[1;33m History cache detected, cleaning.")
+        shutil.rmtree(prc_dir)
+        os.makedirs(prc_dir)
+        print('\033[1;32m "prc" folder created successfully!')
+        print("\033[1;32m Videos processing will start after 5 seconds.")
     else:
-        os.makedirs(processed_dir)
-        logging.info('New "processed" folder created successfully! Videos processing will start after 5 seconds.')
-        #print('"processed" folder created successfully!')
-        #print("Videos processing will start after 5 seconds.")
+        os.makedirs(prc_dir)
+        print('\033[1;32m "prc" folder created successfully!')
+        print("\033[1;32m Videos processing will start after 5 seconds.")
     time.sleep(5)
-
-# if not os.path.exists(processed_dir):
-#     os.makedirs(processed_dir)
-#     print('"processed" folder created successfully!')
-#     print("Videos processing will start after 5 seconds.")
-# time.sleep(5)
+    return prc_dir
 
 
-def rerender():
-    for filename in os.listdir(work_path):
-        if (filename.endswith(".mp4")): #or .avi, .mpeg, whatever.
-            ctlex = "ffmpeg -i " + '"' + filename + '"' + " -c copy " + '"' + processed_dir + filename + '"' + "".format(filename)
-            logging.debug("rerender ctl: " + ctlex)
-            os.system(ctlex)
-            #print("ffmpeg -i " + filename + " -c copy " + processed_dir + filename + "")
-        else:
-            continue
-    #print("All files rerender completed!")
-    logging.info("All files rerender completed!")
+def rerender(wpath, prc_dir, vids):
+    if (vids == 1):
+        for filename in os.listdir(wpath):
+            if (filename.endswith(".ts")): #or .avi, .mpeg, whatever.
+                os.system("ffmpeg -i " + wpath + filename + " -c copy " + wpath + filename[:-3] + ".mp4")
+                # print("ffmpeg -i " + wpath + filename + " -c copy " + wpath + filename[:-3] + ".mp4")
+            else:
+                continue
+        print("\033[1;32m All files rerender completed!")
+    else:
+        for filename in os.listdir(wpath):
+            if (filename.endswith(".ts")): #or .avi, .mpeg, whatever.
+                os.system("ffmpeg -i " + wpath + filename + " -c copy " + prc_dir + filename)
+                # print("ffmpeg -i " + wpath + filename + " -c copy " + prc_dir + filename)
+            else:
+                continue
+        print("\033[1;32m All files rerender completed!")
 
 ###### Post processing(insert videos)
 
-def creat_meg():
-    for filename in os.listdir(processed_dir):
+def creat_meg(prc_dir):
+    for filename in os.listdir(prc_dir):
         if (filename.endswith(".txt")):
-            os.remove(processed_dir + "merge.txt")
+            os.remove(prc_dir + "merge.txt")
         else:
-            if (filename.endswith(".mp4")):
-                f = open(processed_dir + "merge.txt", "a")
+            if (filename.endswith(".ts")):
+                f = open(prc_dir + "merge.txt", "a")
                 f.write("file '" + filename + "'" + "\n")
                 f.close()
             else:
                 continue
-    #print("merge.txt is successfully created!")
-    logging.info("merge.txt is successfully created!")
+    print("\033[1;32m merge.txt is successfully created!")
 
-def insertvid():
+def insertvid(wpath, prc_dir):
     time.sleep(5)
-    #print("Videos insertion will start after 5 second")
-    logging.info("Videos insertion will start after 5 second")
-    file = open(processed_dir + "merge.txt", "r")
+    print("Videos insertion will start after 5 second")
+    file = open(prc_dir + "merge.txt", "r")
     #print(file.readline()[6:23])
     filename = file.readline()[6:]
     fname = '_'.join(filename.split('_')[:-1])
     #print(fname)
-    ctlex = "ffmpeg -fflags +discardcorrupt -f concat -safe 0 -i " + processed_dir + "merge.txt -c copy " + '"' + fname + ".mp4" + '"'.format(fname)
-    logging.debug("Insert ctl: " + ctlex)
-    os.system(ctlex)
+    os.system("ffmpeg -fflags +discardcorrupt -f concat -safe 0 -i "+ prc_dir + "merge.txt -c copy " + wpath + fname + ".mp4")
 
-def cleaner():
-    #print("All operations ran successfully, deleting cache in 5 seconds!")
-    logging.info("All operations ran successfully, deleting cache in 5 seconds!")
+def cleaner(prc_dir):
+    print("\033[1;32m All operations ran successfully, deleting cache in 5 seconds!")
     time.sleep(5)
-    if os.path.exists(processed_dir):
-        shutil.rmtree(processed_dir)
-        #print("processed folder removed successfully!")
-        logging.info('"processed" folder removed successfully!')
+    if os.path.exists(prc_dir):
+        shutil.rmtree(prc_dir)
+        print("\033[1;32m processed folder removed successfully!")
     else:
-        #print("No such directly, quit!")
-        logging.error("No such directly, quit!")
+        print("\033[1;31m No such directly, quit!")
         quit()
 
 
 if __name__ == "__main__":
-    check()
-    init_job()
-    rerender()
-    creat_meg()
-    insertvid()
-    cleaner()
+    start()
