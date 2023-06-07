@@ -2,6 +2,7 @@
 
 import os, time
 import shutil, glob
+import subprocess, re
 ###### Rerender container
 
 gb_path = os.getcwd()
@@ -76,8 +77,12 @@ def rerender(wpath, prc_dir, vids):
     else:
         for filename in os.listdir(wpath):
             if (filename.endswith(".ts")): #or .avi, .mpeg, whatever.
-                os.system("ffmpeg -i " + wpath + filename + " -c copy " + prc_dir + filename)
-                # print("ffmpeg -i " + wpath + filename + " -c copy " + prc_dir + filename)
+                resolution = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "program_stream=width,height", "-of", "default=nw=1:nk=1", wpath + filename], capture_output=True, text=True)
+                if (re.search("540\n960", resolution.stdout)):
+                    os.system("ffmpeg -i " + wpath + filename + " -c copy " + wpath + filename[:-12] + "(竖屏).mp4")
+                else:
+                    os.system("ffmpeg -i " + wpath + filename + " -c copy " + prc_dir + filename)
+                    # print("ffmpeg -i " + wpath + filename + " -c copy " + prc_dir + filename)
             else:
                 continue
         print("\033[1;32m All files rerender completed!")
