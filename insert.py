@@ -69,7 +69,7 @@ def rerender(wpath, prc_dir, vids):
     if (vids == 1):
         for filename in os.listdir(wpath):
             if (filename.endswith(".ts")): #or .avi, .mpeg, whatever.
-                os.system("ffmpeg -i " + wpath + filename + " -c copy " + wpath + filename[:-3] + ".mp4")
+                os.system("ffmpeg -i " + wpath + filename + " -c copy " + wpath + filename[:-12] + ".mp4")
                 # print("ffmpeg -i " + wpath + filename + " -c copy " + wpath + filename[:-3] + ".mp4")
             else:
                 continue
