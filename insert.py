@@ -1,127 +1,208 @@
 # /* cSpell:disable */
 
+# print("\033[91mRed text\033[0m")
+# print("\033[92mGreen text\033[0m")
+# print("\033[93mYellow text\033[0m")
+
 import os, time
-import shutil, glob
-import subprocess, re
+import shutil
+import subprocess
 ###### Rerender container
 
-gb_path = os.getcwd()
-# work_path = os.getcwd()
-# processed_dir = work_path + "\\processed\\"
+import argparse, json
 
-def start():
-    for folder in os.listdir(gb_path):
-        # print(type(folder))
-        wpath = gb_path + "\\" + folder + "\\"
-        # print(wpath)
-        if (os.path.isdir(wpath)):
-            vids = check(wpath)
-            if ( vids != 0 and vids > 1 ):
-                prc_dir = init_job(wpath)
-                rerender(wpath, prc_dir, vids)
-                creat_meg(prc_dir)
-                insertvid(wpath, prc_dir)
-                cleaner(prc_dir)
-            elif (vids == 1):
-                prc_dir = init_job(wpath)
-                rerender(wpath, prc_dir, vids)
-                cleaner(prc_dir)
-            else:
-                print("\033[1;31m No video src detected, quitting.")
-                quit()
+mobvidArr = []
+vidArr = []
+mobMergeEnable = False
+vidMergeEnable = False
+
+def main():
+    parser = argparse.ArgumentParser(description="A script with commands and options.")
+
+    # Define a subparser for the "start" command
+    subparsers = parser.add_subparsers(dest='command')
+    start_parser = subparsers.add_parser('start', help='start command help')
+    
+    # Add the optional "-path" argument to the "start" command
+    start_parser.add_argument('-path', type=str, help="Path to the file or directory")
+
+    args = parser.parse_args()
+
+    # Check if the 'start' command was provided
+    if args.command == 'start':
+        if args.path:
+            print(f"Starting with path: {args.path}")
         else:
-            print("\033[1;31m No Folder found! END process!")
-            quit()
+            print("\033[93mStarting without a specified path. Using current path instead\033[0m")
+            gbPath = os.getcwd()
+            start(gbPath)
+    else:
+        print('\033[91mNo command reveiced.\033[0m')
 
+def start(path):
+    for folder in os.listdir(path):
+        currFolder = os.path.join(path, folder)
+        if (os.path.isdir(currFolder)):
+            resetGlobalValues()
+            prcPath = initWorkEnv(currFolder)
+            initWorkArray(currFolder)
+            # print(mobvidArr, vidArr)
+            reRender(currFolder, prcPath)
+            cleaner(prcPath)
+            resetGlobalValues()
+        else:
+            print(f"\033[93m'{currFolder}' is not a folder\033[0m")
+            resetGlobalValues()
 
-def check(wpath):
-    videos = 0
-    for filename in os.listdir(wpath):
-        if (filename.endswith(".ts")):
-            videos += 1
+def initWorkEnv(currFolder):
+    prcPath = os.path.join(currFolder, 'prc')
+    if (os.path.exists(prcPath)):
+        print("\033[93mHistory cache detected, cleaning\033[0m")
+        shutil.rmtree(prcPath)
+        os.makedirs(prcPath)
+        print("\033[92m'prc' folder created successfully!\033[0m")
+        print("\033[92mVideos processing will start after 5 seconds.\033[0m")
+    else:
+        os.makedirs(prcPath)
+        print("\033[92m'prc' folder created successfully!\033[0m")
+        print("\033[92mVideos processing will start after 5 seconds.\033[0m")
+    time.sleep(5)
+    return prcPath
+
+def initWorkArray(currFolder):
+    for filename in os.listdir(currFolder):
+        if (filename.endswith('.ts')):
+            vidPath = os.path.join(currFolder, filename)
+            # ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of json input.mp4
+            resolution = subprocess.run(["ffprobe", "-v", "error", 
+                                         "-select_streams", "v:0", 
+                                         "-show_entries", "stream=width,height", 
+                                         "-of", "json", vidPath], 
+                                         capture_output=True, text=True)
+            data = json.loads(resolution.stdout)
+            width = data['streams'][0]['width']
+            if (width <= 540):
+                mobvidArr.append(vidPath)
+            else:
+                vidArr.append(vidPath)
         else:
             continue
-    if (videos == 0):
-        print("\033[1;31m No MP4 files in the working directory, quitting ")
-        return 0
-    else:
-        print("\033[1;32m " + str(videos) + " ts files detected, Starting. Curr directory: " + wpath)
-        return videos
 
-
-def init_job(wpath):
-    prc_dir = wpath + "prc\\"
-    if os.path.exists(prc_dir):
-        print("\033[1;33m History cache detected, cleaning.")
-        shutil.rmtree(prc_dir)
-        os.makedirs(prc_dir)
-        print('\033[1;32m "prc" folder created successfully!')
-        print("\033[1;32m Videos processing will start after 5 seconds.")
-    else:
-        os.makedirs(prc_dir)
-        print('\033[1;32m "prc" folder created successfully!')
-        print("\033[1;32m Videos processing will start after 5 seconds.")
-    time.sleep(5)
-    return prc_dir
-
-
-def rerender(wpath, prc_dir, vids):
-    if (vids == 1):
-        for filename in os.listdir(wpath):
-            if (filename.endswith(".ts")): #or .avi, .mpeg, whatever.
-                os.system("ffmpeg -i " + wpath + filename + " -c copy " + wpath + filename[:-12] + ".mp4")
-                # print("ffmpeg -i " + wpath + filename + " -c copy " + wpath + filename[:-3] + ".mp4")
+def reRender(currFolder, prcPath):
+    global mobMergeEnable, vidMergeEnable
+    if (len(vidArr) != 0):
+        numvid = 0
+        for vid in vidArr:
+            # os.system("ffmpeg -i " + wpath + filename + " -c copy " + wpath + filename[:-12] + ".mp4")
+            vidname = vid.split('\\')
+            newvidname = vidname[-1][:vidname[-1].rfind('.')] + '.mp4'
+            status = os.system(f'ffmpeg -i {vid} -c copy {os.path.join(prcPath, newvidname)}')
+            if (status == 0):
+                numvid += 1
             else:
-                continue
-        print("\033[1;32m All files rerender completed!")
-    else:
-        for filename in os.listdir(wpath):
-            if (filename.endswith(".ts")): #or .avi, .mpeg, whatever.
-                resolution = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "program_stream=width,height", "-of", "default=nw=1:nk=1", wpath + filename], capture_output=True, text=True)
-                if (re.search("540\n960", resolution.stdout)):
-                    os.system("ffmpeg -i " + wpath + filename + " -c copy " + wpath + filename[:-12] + "(竖屏).mp4")
+                print(f"\033[91m{vidname[-1]} converted failed\033[0m")
+
+        # print(f"\033[91m{numvid}\033[0m")
+        
+        if (numvid > 1):
+            vidMergeEnable = True
+            genMergeFile(prcPath)
+            insert(currFolder, prcPath, 'vid')
+        elif (numvid == 1):
+            vidMergeEnable = False
+            for file in os.listdir(prcPath):
+                if (file.endswith('.mp4')):
+                    oldFilePath = os.path.join(prcPath, file)
+                    newFileName = file[:-13] + '.mp4'
+                    newFilePath = os.path.join(prcPath, newFileName)
+                    # print(oldFilePath, newFilePath)
+                    os.rename(oldFilePath, newFilePath)
+                    # filePath = os.path.join(prcPath, newFileName)
+                    shutil.move(newFilePath, currFolder)
                 else:
-                    os.system("ffmpeg -i " + wpath + filename + " -c copy " + prc_dir + filename)
-                    # print("ffmpeg -i " + wpath + filename + " -c copy " + prc_dir + filename)
+                    continue
+    
+    if (len(mobvidArr) != 0):
+        mobsubfolder = os.path.join(prcPath, 'sub')
+        numvid = 0
+        os.makedirs(mobsubfolder)
+        for vid in mobvidArr:
+            vidname = vid.split('\\')
+            newvidname = vidname[-1][:vidname[-1].rfind('.')] + '.mp4'
+            status = os.system(f'ffmpeg -i {vid} -c copy {os.path.join(mobsubfolder, newvidname)}')
+            if (status == 0):
+                numvid += 1
             else:
-                continue
-        print("\033[1;32m All files rerender completed!")
+                print(f"\033[91m{vidname[-1]} converted failed\033[0m")
+        
+        if (numvid > 1):
+            mobMergeEnable = True
+            genMergeFile(mobsubfolder)
+            insert(currFolder, prcPath, 'mobvid')
+        elif (numvid == 1):
+            mobMergeEnable = False
+            oldfilename = os.listdir(mobsubfolder)
+            newfilename = oldfilename[0][:-13] + '(竖屏).mp4'
+            oldfilePath = os.path.join(mobsubfolder, oldfilename[0])
+            newfilepath = os.path.join(mobsubfolder, newfilename)
+            os.rename(oldfilePath, newfilepath)
+            # filePath = os.path.join(mobsubfolder, (filename[0][:-13] + '.mp4'))
+            shutil.move(newfilepath, currFolder)
 
-###### Post processing(insert videos)
-
-def creat_meg(prc_dir):
-    for filename in os.listdir(prc_dir):
-        if (filename.endswith(".txt")):
-            os.remove(prc_dir + "merge.txt")
+def genMergeFile(path):
+    for filename in os.listdir(path):
+        if (filename.endswith('.mp4')):
+            f = open(os.path.join(path, 'merge.txt'), 'a')
+            f.write(f'file \'{filename}\'\n')
+            f.close()
         else:
-            if (filename.endswith(".ts")):
-                f = open(prc_dir + "merge.txt", "a")
-                f.write("file '" + filename + "'" + "\n")
-                f.close()
-            else:
-                continue
-    print("\033[1;32m merge.txt is successfully created!")
+            continue
 
-def insertvid(wpath, prc_dir):
-    time.sleep(5)
-    print("Videos insertion will start after 5 second")
-    file = open(prc_dir + "merge.txt", "r")
-    #print(file.readline()[6:23])
-    filename = file.readline()[6:]
-    fname = '_'.join(filename.split('_')[:-1])
-    #print(fname)
-    os.system("ffmpeg -fflags +discardcorrupt -f concat -safe 0 -i "+ prc_dir + "merge.txt -c copy " + wpath + fname + ".mp4")
+def insert(currFolder, prcPath, on):
+    isRan = 0
+    if (vidMergeEnable and on == 'vid'):
+        isRan += 1
+        mergepath = os.path.join(prcPath, 'merge.txt')
+        newvidname = vidArr[0].split('\\')[-1][:-12] + '.mp4'
+        convertedVidPath = os.path.join(currFolder, newvidname)
+        status = os.system(f'ffmpeg -fflags +discardcorrupt -f concat -safe 0 -hwaccel cuda -i {mergepath} -c copy {convertedVidPath}')
+        if (status == 0):
+            print("\033[92mVideo inserted successfully.\033[0m")
+        else:
+            print(f"\033[91mVideo inserted converted failed\033[0m")
 
-def cleaner(prc_dir):
-    print("\033[1;32m All operations ran successfully, deleting cache in 5 seconds!")
-    time.sleep(5)
-    if os.path.exists(prc_dir):
-        shutil.rmtree(prc_dir)
-        print("\033[1;32m processed folder removed successfully!")
+    
+    if (mobMergeEnable and on == 'mobvid'):
+        isRan += 1
+        subFolder = os.path.join(prcPath, 'sub')
+        mergepath = os.path.join(subFolder, 'merge.txt')
+        newvidname = mobvidArr[0].split('\\')[-1][:-12] + '(竖屏).mp4'
+        convertedVidPath = os.path.join(currFolder, newvidname)
+        status = os.system(f'ffmpeg -fflags +discardcorrupt -f concat -safe 0 -hwaccel cuda -i {mergepath} -c copy {convertedVidPath}')
+        if (status == 0):
+            print("\033[92mVideo inserted successfully.\033[0m")
+        else:
+            print(f"\033[91mVideo inserted converted failed\033[0m")
+    
+    if (isRan == 0):
+        print("\033[92mNo need to run insert video.\033[0m")
+
+def cleaner(prcPath):
+    print("\033[93mCleaning cache...\033[0m")
+    time.sleep(3)
+    if (os.path.exists(prcPath)):
+        shutil.rmtree(prcPath)
+        print("\033[93mCache deleted sucessfully.\033[0m")
     else:
-        print("\033[1;31m No such directly, quit!")
-        quit()
+        print("\033[93mNo such directory, moving on!\033[0m")
+
+def resetGlobalValues():
+    global vidArr, mobvidArr, vidMergeEnable, mobMergeEnable
+    vidArr = []
+    mobvidArr = []
+    vidMergeEnable = False
+    mobMergeEnable = False
 
 
 if __name__ == "__main__":
-    start()
+    main()
