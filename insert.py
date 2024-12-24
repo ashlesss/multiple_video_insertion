@@ -96,7 +96,7 @@ def reRender(currFolder, prcPath):
             # os.system("ffmpeg -i " + wpath + filename + " -c copy " + wpath + filename[:-12] + ".mp4")
             vidname = vid.split('\\')
             newvidname = vidname[-1][:vidname[-1].rfind('.')] + '.mp4'
-            status = os.system(f'ffmpeg -i {vid} -c copy {os.path.join(prcPath, newvidname)}')
+            status = os.system(f'ffmpeg -analyzeduration 100M -probesize 50M -i {vid} -c copy {os.path.join(prcPath, newvidname)}')
             if (status == 0):
                 numvid += 1
             else:
@@ -129,7 +129,7 @@ def reRender(currFolder, prcPath):
         for vid in mobvidArr:
             vidname = vid.split('\\')
             newvidname = vidname[-1][:vidname[-1].rfind('.')] + '.mp4'
-            status = os.system(f'ffmpeg -i {vid} -c copy {os.path.join(mobsubfolder, newvidname)}')
+            status = os.system(f'ffmpeg -analyzeduration 100M -probesize 50M -i {vid} -c copy {os.path.join(mobsubfolder, newvidname)}')
             if (status == 0):
                 numvid += 1
             else:

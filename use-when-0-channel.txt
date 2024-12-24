@@ -1,0 +1,1 @@
+ffmpeg -analyzeduration 100M -probesize 50M -i Demo.ts -map 0 -c copy -bsf:a aac_adtstoasc -y Demo.mp4
